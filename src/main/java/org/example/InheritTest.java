@@ -10,6 +10,10 @@ public class InheritTest {
         static int up() {
             return 1;
         }
+
+        static int down() {
+            return 1;
+        }
     }
 
     static class Child extends Parent{
@@ -26,6 +30,9 @@ public class InheritTest {
     public static void main(String[] args) {
         System.out.println(Child.up());
         String family = new Child().family;
+
+        System.out.println("hello");
+
 
     }
 
