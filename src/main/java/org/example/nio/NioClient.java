@@ -1,5 +1,5 @@
 
-package nio;
+package org.example.nio;
 
 import java.io.BufferedWriter;
 import java.io.IOException;
