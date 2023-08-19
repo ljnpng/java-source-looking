@@ -1,53 +1,48 @@
+
 package nio;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
-import java.nio.channels.SelectionKey;
-import java.nio.channels.Selector;
-import java.nio.channels.ServerSocketChannel;
-import java.nio.channels.SocketChannel;
+import java.nio.channels.*;
 import java.nio.charset.StandardCharsets;
 import java.util.Iterator;
 import java.util.Set;
 
 public class NioServer {
+    public static void main(String[] args) {
+        try (Selector selector = Selector.open();
+             ServerSocketChannel ssChannel = ServerSocketChannel.open()) {
+            ssChannel.configureBlocking(false);
+            ssChannel.register(selector, SelectionKey.OP_ACCEPT);
+            ssChannel.bind(new InetSocketAddress(8080));
 
-    public static void main(String[] args) throws Exception {
-        Selector selector = Selector.open();
-
-        // 创建一个ServerSocketChannel，并且绑定到指定端口上
-        ServerSocketChannel ssChannel = ServerSocketChannel.open();
-        ssChannel.configureBlocking(false);
-        ssChannel.register(selector, SelectionKey.OP_ACCEPT);
-        ssChannel.socket()
-                .bind(new InetSocketAddress(8080));
-
-        while (true) {
-            selector.select(); // 阻塞等待就绪的Channel，这是关键点之一
-            Set<SelectionKey> keys = selector.selectedKeys();
-            Iterator<SelectionKey> keyIterator = keys.iterator();
-            while (keyIterator.hasNext()) {
-                SelectionKey key = keyIterator.next();
-                if (key.isAcceptable()) {
-                    System.out.println("接受请求");
-                    ServerSocketChannel ssChannel1 = (ServerSocketChannel) key.channel();
-                    SocketChannel socketChannel = ssChannel1.accept();
-                    socketChannel.configureBlocking(false);
-                    socketChannel.register(selector, SelectionKey.OP_READ);
-                } else if (key.isReadable()) {
-                    System.out.println("读取数据");
-                    SocketChannel socketChannel = (SocketChannel) key.channel();
-                    System.out.println(readDataFromSocketChannel(socketChannel));
-                    socketChannel.close();
+            ByteBuffer buffer = ByteBuffer.allocate(1024); // 1kb
+            while (true) {
+                selector.select();
+                Set<SelectionKey> keys = selector.selectedKeys();
+                Iterator<SelectionKey> keyIterator = keys.iterator();
+                while (keyIterator.hasNext()) {
+                    SelectionKey key = keyIterator.next();
+                    if (key.isAcceptable()) {
+                        ServerSocketChannel ssChannel1 = (ServerSocketChannel) key.channel();
+                        SocketChannel socketChannel = ssChannel1.accept();
+                        socketChannel.configureBlocking(false);
+                        socketChannel.register(selector, SelectionKey.OP_READ);
+                    } else if (key.isReadable()) {
+                        SocketChannel socketChannel = (SocketChannel) key.channel();
+                        String data = readDataFromSocketChannel(socketChannel, buffer);
+                        System.out.println(data.replace("EOF", "")); // Removing the special character
+                    }
+                    keyIterator.remove();
                 }
-                keyIterator.remove();
             }
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
 
-    private static String readDataFromSocketChannel(SocketChannel socketChannel) throws IOException {
-        ByteBuffer buffer = ByteBuffer.allocate(1024); // 1kb
+    private static String readDataFromSocketChannel(SocketChannel socketChannel, ByteBuffer buffer) throws IOException {
         StringBuilder data = new StringBuilder();
         while (true) {
             buffer.clear();
@@ -56,10 +51,13 @@ public class NioServer {
                 break;
             }
             buffer.flip();
-            int limit = buffer.limit();
-            byte[] dest = new byte[limit];
+            byte[] dest = new byte[buffer.limit()];
             buffer.get(dest);
-            data.append(new String(dest, StandardCharsets.UTF_8));
+            String segment = new String(dest, StandardCharsets.UTF_8);
+            data.append(segment);
+            if (segment.endsWith("EOF")) {
+                break;
+            }
         }
         return data.toString();
     }
