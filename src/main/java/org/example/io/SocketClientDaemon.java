@@ -15,6 +15,7 @@ public class SocketClientDaemon {
             latch.countDown();
         }
 
+        // optional 阻塞主线程
         synchronized (SocketClientDaemon.class) {
             try {
                 SocketClientDaemon.class.wait();
